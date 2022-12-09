@@ -18,13 +18,17 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "rtc.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-	#include "stdio.h"
+
 	#include <string.h>
+	#include <stdio.h>
+	#include <stdlib.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -88,6 +92,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 	HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
 	char DataChar[0xff];
@@ -99,8 +104,16 @@ int main(void)
 	sprintf(DataChar,"\r\n\tBuild: %s. Time: %s." , DATE_as_int_str , TIME_as_int_str ) ;
 	HAL_UART_Transmit( &huart1, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
 
-	sprintf(DataChar,"\r\n\tFor debug: UART1-115200/8-N-1" ) ;
+	sprintf(DataChar,"\r\n\tFor debug: UART1-115200/8-N-1\r\n" ) ;
 	HAL_UART_Transmit( &huart1, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
+
+	RTC_TimeTypeDef TimeSt = { 0 } ;
+	TimeSt.Hours 	= 13 ;
+	TimeSt.Minutes 	= 35 ;
+	TimeSt.Seconds 	=  0 ;
+	HAL_RTC_SetTime(&hrtc, &TimeSt, RTC_FORMAT_BIN);
+	uint32_t x_u32 = 75000;
+	uint32_t y_u32 = 53000;
 
   /* USER CODE END 2 */
 
@@ -108,12 +121,58 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_Delay(1000);
-	  HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
-	  HAL_GPIO_TogglePin(LD4_GPIO_Port,LD4_Pin);
+	HAL_Delay(1000);
+	HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
+	HAL_GPIO_TogglePin(LD4_GPIO_Port,LD4_Pin);
 
-	  sprintf(DataChar,"$GNGGA,093442.00,5029.75956,N,03046.53359,E,1,12,0.64,112.2,M,25.3,M,,*41\r\n" ) ;
-	  HAL_UART_Transmit( &huart3, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
+//	sprintf(DataChar,"$GNGGA,093442.00,5029.75956,N,03046.53359,E,1,12,0.64,112.2,M,25.3,M,,*41\r\n" ) ;
+//	HAL_UART_Transmit( &huart3, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
+
+	//uint8_t gnss_lenght_u8 = strlen(DataChar);
+	uint8_t gnss_lenght_u8 = 75;
+//	sprintf(DataChar, "GNSS length: %d\r\n", gnss_lenght_u8);
+//	HAL_UART_Transmit( &huart1, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
+
+//	#define CS_SIZE	4
+//	char cs_glue_string[CS_SIZE];
+	//	cs glue:
+//	memset( cs_glue_string, 0, CS_SIZE );
+//	memcpy( cs_glue_string, &DataChar[gnss_lenght_u8 - 4], 2 );
+//	uint8_t cs_glue_u8 = strtol(cs_glue_string, NULL, 16 );
+//
+	uint8_t cs_calc_u8 = 0;
+//	cs_calc_u8 = DataChar[1];
+//	for (int i=2; i<(gnss_lenght_u8 - 5); i++) {
+//		cs_calc_u8 ^= DataChar[i];
+//	}
+//
+//	if (cs_calc_u8 == cs_glue_u8) {
+//		sprintf(DataChar, "chSum Ok\r\n");
+//		HAL_UART_Transmit( &huart1, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
+//	}
+
+
+	x_u32 = x_u32 + 10;
+	y_u32 = y_u32 + 10;
+	HAL_RTC_GetTime(&hrtc, &TimeSt, RTC_FORMAT_BIN);
+	sprintf(DataChar,"RTC Time: %02d:%02d:%02d\r\n",TimeSt.Hours, TimeSt.Minutes, TimeSt.Seconds );
+	HAL_UART_Transmit( &huart1, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
+
+	sprintf(DataChar,"$GNGGA,%02d%02d%02d.00,5029.%05lu,N,03046.%05lu,E,1,12,0.64,112.2,M,25.3,M,,*41\r\n",
+			TimeSt.Hours, TimeSt.Minutes, TimeSt.Seconds, x_u32, y_u32 ) ;
+	//HAL_UART_Transmit( &huart3, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
+
+	cs_calc_u8 = DataChar[1];
+	for (int i=2; i<(gnss_lenght_u8 - 5); i++) {
+		cs_calc_u8 ^= DataChar[i];
+	}
+
+//	sprintf(DataChar, "New chSum %d\r\n", cs_calc_u8 );
+//	HAL_UART_Transmit( &huart1, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
+
+	sprintf(DataChar,"$GNGGA,%02d%02d%02d.00,5029.%05lu,N,03046.%05lu,E,1,12,0.64,112.2,M,25.3,M,,*%02x\r\n",
+			TimeSt.Hours, TimeSt.Minutes, TimeSt.Seconds, x_u32, y_u32, cs_calc_u8) ;
+	HAL_UART_Transmit( &huart3, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
 
     /* USER CODE END WHILE */
 
@@ -130,13 +189,15 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL2;
@@ -155,6 +216,12 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC;
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
