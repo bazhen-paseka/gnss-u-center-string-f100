@@ -87,8 +87,10 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
-	char DataChar[100];
+	HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
+	char DataChar[0xff];
 	sprintf(DataChar,"\r\n\r\n\tDIEGO - dot clock for bedroom");
 	HAL_UART_Transmit( &huart1, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
 
@@ -105,8 +107,14 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-  {	  HAL_Delay(1000);
-  HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
+  {
+	  HAL_Delay(1000);
+	  HAL_GPIO_TogglePin(LD3_GPIO_Port,LD3_Pin);
+	  HAL_GPIO_TogglePin(LD4_GPIO_Port,LD4_Pin);
+
+	  sprintf(DataChar,"$GNGGA,093442.00,5029.75956,N,03046.53359,E,1,12,0.64,112.2,M,25.3,M,,*41\r\n" ) ;
+	  HAL_UART_Transmit( &huart3, (uint8_t *)DataChar , strlen(DataChar) , 100 ) ;
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
